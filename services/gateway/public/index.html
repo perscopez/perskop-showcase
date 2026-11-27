@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>perskop Control UI</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        background: #0b1020;
+        color: #e8ecff;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        max-width: 960px;
+      }
+      h1 { margin: 0 0 8px; font-size: 1.5rem; }
+      .muted { color: #9aa7c7; font-size: 0.9rem; }
+      .row { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+      input, button, textarea {
+        background: #151d35;
+        border: 1px solid #2a3558;
+        color: inherit;
+        border-radius: 8px;
+        padding: 10px 12px;
+      }
+      input { min-width: 260px; flex: 1; }
+      button { cursor: pointer; }
+      .card {
+        background: #121a31;
+        border: 1px solid #243055;
+        border-radius: 12px;
+        padding: 14px;
+        margin-bottom: 12px;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #243055;
+        margin-right: 6px;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 8px 0 0;
+        font-size: 0.9rem;
+      }
+      #error { color: #ff8f8f; }
+    </style>
+  </head>
+  <body>
+    <h1>perskop Control UI</h1>
+    <p class="muted">Phase 1 — memory, tasks, provider status</p>
+
+    <div class="row">
+      <input id="token" type="password" placeholder="API token (Bearer)" />
+      <button id="saveToken">Kaydet</button>
+      <button id="refresh">Yenile</button>
+    </div>
+
+    <div id="error"></div>
+    <div id="status" class="card muted">Bağlanıyor…</div>
+    <h2 class="muted" style="font-size:1rem;margin:20px 0 8px">Memory</h2>
+    <div id="list"></div>
+    <h2 class="muted" style="font-size:1rem;margin:20px 0 8px">Tasks</h2>
+    <div id="tasks"></div>
+
+    <script>
+      const tokenInput = document.getElementById("token");
+      const errorEl = document.getElementById("error");
+      const statusEl = document.getElementById("status");
+      const listEl = document.getElementById("list");
+      const tasksEl = document.getElementById("tasks");
+
+      tokenInput.value = localStorage.getItem("perskop_token") || "";
+
+      document.getElementById("saveToken").onclick = () => {
+        localStorage.setItem("perskop_token", tokenInput.value.trim());
+        refresh();
+      };
+      document.getElementById("refresh").onclick = refresh;
+
+      // Every value rendered below can contain model, mail or chat text, so it is escaped.
+      function esc(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+        })[c]);
+      }
+
+      async function api(path) {
+        const token = tokenInput.value.trim();
+        const res = await fetch(path, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        return res.json();
+      }
+
+      async function refresh() {
+        errorEl.textContent = "";
+        listEl.innerHTML = "";
+        tasksEl.innerHTML = "";
+        try {
+          const status = await api("/api/status");
+          statusEl.innerHTML = `
+            <div><span class="tag">providers</span> ${esc(status.providers.order.join(" → "))}</div>
+            <div class="muted">default: ${esc(status.providers.default)}</div>
+          `;
+
+          const memory = await api("/api/memory?limit=20");
+          for (const item of memory.items) {
+            const card = document.createElement("div");
+            card.className = "card";
+            card.innerHTML = `
+              <div>
+                <span class="tag">${esc(item.source)}</span>
+                ${item.provider ? `<span class="tag">${esc(item.provider)}</span>` : ""}
+                <strong>${esc(item.title)}</strong>
+                <span class="muted"> · ${esc(item.created_at)}</span>
+              </div>
+              <pre>${esc(item.content)}</pre>
+            `;
+            listEl.appendChild(card);
+          }
+
+          const tasks = await api("/api/tasks?limit=10");
+          for (const t of tasks.items) {
+            const card = document.createElement("div");
+            card.className = "card";
+            card.innerHTML = `
+              <div>
+                <span class="tag">${esc(t.source)}</span>
+                <span class="tag">${esc(t.status)}</span>
+                ${t.provider ? `<span class="tag">${esc(t.provider)}</span>` : ""}
+                <strong>${esc(t.prompt.slice(0, 60))}</strong>
+                <span class="muted"> · ${esc(t.created_at)}</span>
+              </div>
+              ${t.response ? `<pre>${esc(t.response)}</pre>` : ""}
+              ${t.error ? `<pre style="color:#ff8f8f">${esc(t.error)}</pre>` : ""}
+            `;
+            tasksEl.appendChild(card);
+          }
+        } catch (err) {
+          errorEl.textContent = String(err);
+          statusEl.textContent = "Bağlantı hatası — token ve gateway adresini kontrol et.";
+        }
+      }
+
+      refresh();
+    </script>
+  </body>
+</html>

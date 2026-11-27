@@ -1,0 +1,10 @@
+{
+  "name": "@perskop/sandbox-executor",
+  "description": "Runs agent work in short-lived, locked-down Docker containers",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

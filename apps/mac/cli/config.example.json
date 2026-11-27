@@ -1,0 +1,7 @@
+{
+  "apiUrl": "http://127.0.0.1:8787",
+  "apiToken": "REPLACE_WITH_GATEWAY_TOKEN",
+  "codexCmd": "codex",
+  "cursorCmd": "cursor-agent",
+  "agyCmd": "agy"
+}

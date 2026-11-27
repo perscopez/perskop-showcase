@@ -1,0 +1,46 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* Hermes Nous dark palette (from hermes-fork themes/presets.ts) */
+@theme {
+  --color-background: #0d2f86;
+  --color-foreground: #ffe6cb;
+  --color-card: #12378f;
+  --color-muted: #183f9a;
+  --color-muted-foreground: #b5c7f3;
+  --color-primary: #ffe6cb;
+  --color-primary-foreground: #0d2f86;
+  --color-accent: #1540b1;
+  --color-border: color-mix(in srgb, #ffe6cb 18%, transparent);
+  --color-user-bubble: #1b45a4;
+  --font-sans: "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background-image:
+      radial-gradient(1200px 600px at 10% -10%, #1540b1 0%, transparent 55%),
+      radial-gradient(900px 500px at 100% 0%, #0053fd33 0%, transparent 50%);
+  }
+}
+
+.composer-glass {
+  background: color-mix(in srgb, var(--color-card) 78%, transparent);
+  backdrop-filter: blur(12px) saturate(1.12);
+  -webkit-backdrop-filter: blur(12px) saturate(1.12);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-foreground) 20%, transparent);
+  border-radius: 999px;
+}

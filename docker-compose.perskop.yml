@@ -1,0 +1,140 @@
+# Perskop self-hosted stack: gateway + sandbox executor + egress proxy.
+#
+# Host paths are configurable through environment variables (see .env.example
+# at the repository root). Defaults point to /srv/perskop.
+# FULL_ACCESS is off by default: agent work goes through the sandbox executor
+# and approval gates. Only enable it on a single-user host you fully trust.
+services:
+  perskop-gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    container_name: perskop-gateway
+    restart: unless-stopped
+    env_file:
+      - ./services/gateway/.env
+    environment:
+      DATA_DIR: /data
+      PERSKOP_FULL_ACCESS: ${PERSKOP_FULL_ACCESS:-false}
+      PATH: /home/node/.opencode/bin:/home/node/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      CODEX_CMD: /home/node/.local/bin/codex
+      CURSOR_CMD: /home/node/.local/bin/cursor-agent
+      OPENCODE_CMD: /home/node/.local/bin/opencode
+      AGY_CMD: /home/node/.local/bin/agy
+      PERSKOP_EXECUTOR_URL: http://sandbox-executor:18788
+      PERSKOP_EXECUTOR_TOKEN: ${PERSKOP_EXECUTOR_TOKEN}
+      # Any OpenAI-compatible endpoint (self-hosted proxy, local model server, ...).
+      PERSKOP_LLM_PROXY_URL: ${PERSKOP_LLM_PROXY_URL}
+      PERSKOP_LLM_PROXY_SECRET: ${PERSKOP_LLM_PROXY_SECRET}
+    volumes:
+      - ./services/gateway/data:/data
+      # Provider CLI binaries and their login state, prepared on the host.
+      - ${PERSKOP_CREDENTIAL_ROOT:-/srv/perskop/credentials}/bin:/home/node/.local/bin:ro
+      - ${PERSKOP_CREDENTIAL_ROOT:-/srv/perskop/credentials}/codex:/home/node/.codex:rw
+      - ${PERSKOP_CREDENTIAL_ROOT:-/srv/perskop/credentials}/cursor:/home/node/.cursor:rw
+      - ${PERSKOP_CREDENTIAL_ROOT:-/srv/perskop/credentials}/opencode:/home/node/.opencode:rw
+      - ${PERSKOP_CREDENTIAL_ROOT:-/srv/perskop/credentials}/opencode_share:/home/node/.local/share/opencode:rw
+      - ${PERSKOP_CREDENTIAL_ROOT:-/srv/perskop/credentials}/config:/home/node/.config:rw
+      - ${PERSKOP_CREDENTIAL_ROOT:-/srv/perskop/credentials}/gemini:/home/node/.gemini:rw
+    ports:
+      - "127.0.0.1:8787:8787"
+    privileged: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - perskop_gateway
+      - perskop_sandbox_internal
+
+  sandbox-executor:
+    build:
+      context: ./services/sandbox-executor
+      dockerfile: Dockerfile
+    container_name: sandbox-executor
+    restart: unless-stopped
+    environment:
+      PERSKOP_EXECUTOR_TOKEN: ${PERSKOP_EXECUTOR_TOKEN}
+      # Must be the same path on the host and in this container, because it is
+      # handed to the Docker daemon as a bind source for child containers.
+      WORKSPACE_HOST_PATH: ${PERSKOP_WORKSPACE_HOST_PATH:-/srv/perskop/workspace-staging}
+      PERSKOP_SANDBOX_NETWORK: perskop_sandbox_internal
+      PERSKOP_CREDENTIAL_ROOT: ${PERSKOP_CREDENTIAL_ROOT:-/srv/perskop/credentials}
+      PERSKOP_PROVIDER_PROXY_URL: http://provider-egress-proxy:18888
+      PERSKOP_REPOSITORY_ROOT: /repositories
+    volumes:
+      # The executor launches sandbox containers through the Docker API.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${PERSKOP_WORKSPACE_HOST_PATH:-/srv/perskop/workspace-staging}:${PERSKOP_WORKSPACE_HOST_PATH:-/srv/perskop/workspace-staging}
+      - ${PERSKOP_REPOSITORY_HOST_PATH:-/srv/perskop/repositories/perskop.git}:/repositories/perskop:ro
+    privileged: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_OVERRIDE # create and remove task workspaces owned by the sandbox uid
+      - CHOWN # hand each ephemeral workspace to the non-root child container uid
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - perskop_sandbox_internal
+
+  provider-egress-proxy:
+    build:
+      context: ./services/provider-egress-proxy
+      dockerfile: Dockerfile
+    container_name: provider-egress-proxy
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    environment:
+      PORT: 18888
+      PROVIDER_EGRESS_ALLOWLIST: >-
+        chatgpt.com,.chatgpt.com,openai.com,.openai.com,
+        cursor.com,.cursor.com,cursor.sh,.cursor.sh,
+        google.com,.google.com,googleapis.com,.googleapis.com,
+        z.ai,.z.ai,bigmodel.cn,.bigmodel.cn,
+        opencode.ai,.opencode.ai
+      PROVIDER_EGRESS_PORTS: "443"
+      PROVIDER_EGRESS_MAX_BYTES: "67108864"
+      PROVIDER_EGRESS_MAX_CONNECTION_MS: "600000"
+      PROVIDER_EGRESS_IDLE_MS: "60000"
+    privileged: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 128m
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - perskop_sandbox_internal
+      - perskop_provider_external
+
+networks:
+  perskop_gateway:
+    name: perskop_gateway
+  perskop_sandbox_internal:
+    name: perskop_sandbox_internal
+    internal: true
+  perskop_provider_external:
+    name: perskop_provider_external

@@ -1,0 +1,11 @@
+{
+  "name": "@perskop/provider-egress-proxy",
+  "description": "Default-deny CONNECT proxy for sandboxed provider CLIs",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}

@@ -1,0 +1,49 @@
+# Dependencies & build output
+node_modules/
+dist/
+dist-electron/
+release/
+coverage/
+*.tsbuildinfo
+
+# Environment & secrets (never commit real values)
+.env
+.env.*
+!.env.example
+
+# Local data
+services/gateway/data/
+services/gateway/test-*/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Keys & credentials
+*.pem
+*.key
+*.crt
+id_rsa*
+id_ed25519*
+id_ecdsa*
+credentials.json
+service-account.json
+oauth_creds.json
+*_credentials.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS & editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# AI assistant / agent local state
+.claude/
+.cursor/
+.codex/
+.engram/

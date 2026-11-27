@@ -1,0 +1,14 @@
+{
+  "name": "@perskop/mac-cli",
+  "description": "Command-line client for the perskop gateway",
+  "license": "MIT",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "perskop": "./perskop.mjs"
+  },
+  "scripts": {
+    "chat": "node perskop.mjs chat"
+  }
+}
